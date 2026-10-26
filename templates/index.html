@@ -1,0 +1,135 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Study AI | Class 12</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#080d18;color:#eef2ff;font-family:Arial,sans-serif;padding:16px}
+main{max-width:760px;margin:auto}
+h1{color:#55e6c1}
+p,.muted{color:#aab6cc;line-height:1.5}
+.panel{background:#111a2b;border:1px solid #29364c;border-radius:14px;padding:16px;margin:14px 0}
+label{display:block;margin:12px 0 6px}
+select,textarea,input,button{width:100%;padding:12px;border-radius:9px;border:1px solid #34445e;background:#0a1220;color:white;font-size:16px;box-sizing:border-box}
+textarea{min-height:110px}
+button{background:#55e6c1;color:#071510;font-weight:bold;border:0;margin-top:12px}
+.secondary{background:#26364e;color:white}
+#answer{white-space:pre-wrap;line-height:1.7;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main>
+<h1>Study AI</h1>
+<p>CBSE Class 12 • Science • Commerce • Arts</p>
+<section class="panel">
+<label for="stream">Stream</label>
+<select id="stream">
+<option>Science</option><option>Commerce</option><option>Arts</option>
+</select>
+<label for="subject">Subject</label>
+<select id="subject"></select>
+<label for="language">Answer language</label>
+<select id="language">
+<option>English</option>
+<option>Marathi</option>
+<option>English and Marathi</option>
+</select>
+<label for="mode">Study mode</label>
+<select id="mode">
+<option value="tutor">Real AI tutor</option>
+<option value="short">Short exam answer</option>
+<option value="notes">Chapter notes</option>
+<option value="quiz">MCQ quiz</option>
+<option value="solve">Step-by-step solver</option>
+<option value="revision">Revision sheet</option>
+<option value="exam">Exam-style answer</option>
+</select>
+<label for="chapter">Chapter (optional)</label>
+<input id="chapter" placeholder="Chapter name">
+<label for="question">Question or topic</label>
+<textarea id="question" placeholder="Type a question or paste a problem..."></textarea>
+<button id="ask">Ask Study AI</button>
+<p id="status" class="muted">Ready to study. AI requests require an API key.</p>
+</section>
+<section class="panel">
+<h2>Answer</h2>
+<div id="answer">Your AI answer will appear here.</div>
+<button id="save" class="secondary">Save answer</button>
+<button id="showSaved" class="secondary">Show saved answers</button>
+<div id="saved"></div>
+</section>
+</main>
+<script>
+const subjects = {
+ Science:["Physics","Chemistry","Mathematics","Biology","Computer Science","English"],
+ Commerce:["Accountancy","Business Studies","Economics","Mathematics","English","Informatics Practices"],
+ Arts:["History","Geography","Political Science","Psychology","Sociology","Economics","English"]
+};
+const $ = id => document.getElementById(id);
+let lastQuestion = "", lastAnswer = "";
+
+function updateSubjects(){
+ const list = subjects[$("stream").value];
+ $("subject").innerHTML = list.map(s=>`<option>${s}</option>`).join("");
+}
+$("stream").addEventListener("change", updateSubjects);
+updateSubjects();
+
+$("ask").addEventListener("click", async ()=>{
+ const question = $("question").value.trim();
+ if(!question){$("status").textContent="Enter a question first.";return;}
+ $("ask").disabled = true;
+ $("status").textContent="Thinking...";
+ $("answer").textContent="";
+ try{
+  const res = await fetch("/api/ask",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({
+    stream:$("stream").value,subject:$("subject").value,
+    language:$("language").value,mode:$("mode").value,
+    chapter:$("chapter").value,question
+   })
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error || "Request failed");
+  lastQuestion=question;lastAnswer=data.answer;
+  $("answer").textContent=data.answer;
+  $("status").textContent="Answer ready. Check important facts against your CBSE textbook.";
+ }catch(e){$("status").textContent=e.message;}
+ finally{$("ask").disabled=false;}
+});
+
+$("save").addEventListener("click", async ()=>{
+ if(!lastAnswer){$("status").textContent="Generate an answer first.";return;}
+ try{
+  const res=await fetch("/api/save",{
+   method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({question:lastQuestion,answer:lastAnswer})
+  });
+  const data=await res.json();
+  $("status").textContent=res.ok?"Answer saved on this device.":data.error;
+ }catch(e){$("status").textContent="Could not save answer.";}
+});
+
+$("showSaved").addEventListener("click", async ()=>{
+ try{
+  const res=await fetch("/api/saved");
+  const items=await res.json();
+  $("saved").replaceChildren();
+  if(!items.length){$("saved").textContent="No saved answers yet.";return;}
+  items.slice().reverse().forEach(item=>{
+   const box=document.createElement("div");
+   box.className="panel";
+   const q=document.createElement("strong");q.textContent=item.question;
+   const a=document.createElement("p");a.textContent=item.answer;
+   box.append(q,a);$("saved").append(box);
+  });
+ }catch(e){$("status").textContent="Could not load saved answers.";}
+});
+</script>
+</body>
+</html>
